@@ -258,7 +258,6 @@ def main():
             print "Bye!!!"
             break
 
-    # import pdb; pdb.set_trace()
     if bills and args.save:
         total_eq, total_dl = [], []
         out = "RECEIPT FOR ELECTRICITY BILL\n"
