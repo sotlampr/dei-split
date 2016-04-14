@@ -8,6 +8,7 @@ import argparse
 import sys
 
 MAX_ROOMMATES = 10
+RECEIPT_COLWIDTH = 40
 
 art = """
                 zeeeeee-
@@ -54,6 +55,8 @@ def init_parser():
                              "adding up to 1 i.e. 0.6, 0.4. If a value is not "
                              "given, it will be filled in automatically "
                              "(default: 0.67 0.33)")
+    parser.add_argument('-s' '--save', action='store_true', dest='save',
+                        default=False, help="save a receipt.txt file")
     return parser
 
 
@@ -204,19 +207,25 @@ def loop():
                 print "Please give only numerical input the next time!"
 
 
-def report(values_eq, values_dl, n_roommates, deal):
-    print "========== PAYMENT REPORT =========="
-    print("Total amount to be paid: %.2f" % (sum(values_eq) + sum(values_dl)))
+def report(values_eq, values_dl, n_roommates, deal, verbose=False):
+    if verbose:
+        print "========== PAYMENT REPORT =========="
+        print("Total amount to be paid: %.2f" % (sum(values_eq) +
+                                                 sum(values_dl)))
     to_pay_eq = sum(values_eq) / float(n_roommates)
     sum_values_dl = sum(values_dl)
+    msg_all = ''
     for i, ratio in enumerate(deal):
         to_pay = sum_values_dl * ratio
         total = to_pay_eq + to_pay
         msg = "Roomie n.%d with deal ratio %.2f will pay:\n"
         msg += "%.2f for the equal share and "
         msg += "%.2f according to the deal.\n"
-        msg += "\tTOTAL: %.2f\n"
-        print msg %(i+1, ratio, to_pay_eq, to_pay, total)
+        msg += "\tTOTAL: %.2f\n\n"
+        if verbose:
+            print msg %(i+1, ratio, to_pay_eq, to_pay, total)
+        msg_all += msg %(i+1, ratio, to_pay_eq, to_pay, total)
+    return msg_all
 
 
 def main():
@@ -226,7 +235,9 @@ def main():
     print "Welcome to the electricity bill splitter."
     print(art)
     sys.stdout.write("First, ")
+    bills = []
     while True:
+        id = raw_input("please enter an ID for this bill\n")
         print "enter the values that should be split equally:"
         opcode, values_eq = loop()
         if opcode == 1:
@@ -238,12 +249,76 @@ def main():
 
         report(values_eq, values_dl, n_roommates, deal)
 
-        more = raw_input("Do you want to continue? [y, n]")
+        bills.append((id, values_eq, values_dl))
+
+        more = raw_input("Do you want to continue? [y, n]\n")
         if more.lower() =='y':
             continue
         else:
             print "Bye!!!"
             break
+
+    # import pdb; pdb.set_trace()
+    if bills and args.save:
+        total_eq, total_dl = [], []
+        out = "RECEIPT FOR ELECTRICITY BILL\n"
+        out += ('=' * RECEIPT_COLWIDTH) + '\n\n'
+        for id, values_eq, values_dl in bills:
+            total_eq.extend(values_eq)
+            total_dl.extend(values_dl)
+            out += (RECEIPT_COLWIDTH * '-') + '\n'
+            out += '--- %s ' % id
+            out += (RECEIPT_COLWIDTH - 5 - len(id)) * '-'
+            out += '\n'
+            out += (RECEIPT_COLWIDTH * '-') + '\n'
+            out += "equal splits "
+            out += ((RECEIPT_COLWIDTH / 2) - 14) * '-'
+            out += '|'
+            out += "deal splits "
+            out += ((RECEIPT_COLWIDTH / 2) - 12) * '-'
+            out += '\n'
+
+            # Fill with blanks so both arrays have the same length
+            len_eq = len(values_eq)
+            len_dl = len(values_dl)
+            if len_eq > len_dl:
+                values_dl.extend([0.0 for i in range(len_eq-len_dl)])
+            elif len_eq < len_dl:
+                values_eq.extend([0.0 for i in range(len_eq-len_dl)])
+
+            for eq, dl in zip(values_eq, values_dl):
+                if eq == 0.0:
+                    eq = ''
+                out += str(eq)
+                out += ((RECEIPT_COLWIDTH / 2) - len(str(eq)) - 1) * ' '
+                out += '|'
+                if dl == 0.0:
+                    dl = ''
+                out += str(dl)
+                out += ((RECEIPT_COLWIDTH  / 2) - len(str(dl))) * ' '
+                out += '\n'
+
+            out += ((RECEIPT_COLWIDTH / 2) - 6) * ' '
+            out += 'total|'
+            out += ((RECEIPT_COLWIDTH / 2) - 6) * ' '
+            out += 'total\n'
+
+            sum_eq, sum_dl = str(sum(values_eq)), str(sum(values_dl))
+            out += ((RECEIPT_COLWIDTH / 2) - len(sum_eq) - 2) * ' '
+            out +=  sum_eq + ' |'
+            out += ((RECEIPT_COLWIDTH / 2) - len(sum_dl) - 1) * ' '
+            out +=  sum_dl + '\n\n'
+
+            out += "Payments:\n"
+            out += report(values_eq, values_dl, n_roommates, deal, False)
+            out += '\n\n'
+
+
+        out += '\n SUM FOR %d BILLS:\n' % len(bills)
+        out += report(total_eq, total_dl, n_roommates, deal, False)
+        with open('receipt.txt', 'w') as file:
+            file.write(out)
+
 
     return 0
 
